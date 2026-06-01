@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMod DarkRP Bank</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #141419; color: #e2e8f0;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 20px;
+        }
+        .bank-card {
+            background: #1e1e26; border: 1px solid #2d2d3d; border-radius: 12px;
+            padding: 40px 30px; width: 100%; max-width: 450px; text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        .bank-logo { font-size: 50px; margin-bottom: 15px; }
+        h2 { font-size: 24px; color: #fff; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .subtitle { font-size: 14px; color: #718096; margin-bottom: 30px; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        label { font-size: 12px; color: #a0aec0; text-transform: uppercase; display: block; margin-bottom: 5px; font-weight: bold;}
+        input {
+            width: 100%; padding: 14px; background: #111115; border: 2px solid #2d2d3d;
+            border-radius: 8px; color: #fff; font-size: 16px; text-align: center; transition: border-color 0.3s;
+        }
+        input:focus { border-color: #4a5568; outline: none; }
+        button, input[type="submit"] {
+            width: 100%; padding: 14px; background: #3182ce; border: none; border-radius: 8px;
+            color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s;
+        }
+        button:hover, input[type="submit"]:hover { background: #2b6cb0; }
+        .btn-transfer { background: #e53e3e; }
+        .btn-transfer:hover { background: #c53030; }
+        .result-box {
+            margin-top: 30px; padding-top: 25px; border-top: 1px solid #2d2d3d;
+            display: none;
+        }
+        .transfer-box { margin-top: 25px; padding-top: 25px; border-top: 1px dashed #2d2d3d; text-align: left; }
+        .player-name { color: #63b3ed; font-weight: bold; }
+        .balance-amount { font-size: 32px; color: #48bb78; font-weight: bold; margin-top: 5px; margin-bottom: 15px;}
+        .error-box { margin-top: 25px; color: #f56565; font-size: 15px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="bank-card">
+        <div class="bank-logo">🏦</div>
+        <h2>Центральний Банк</h2>
+        <p class="subtitle">Електронні перекази</p>
+
+        <div id="authBlock">
+            <div class="input-group">
+                <input type="text" id="steamIdInput" placeholder="Введіть свій SteamID">
+            </div>
+            <button onclick="checkBalance()">Увійти в кабінет</button>
+        </div>
+
+        <div id="resultBox" class="result-box">
+            <p style="color:#a0aec0;">Вітаємо, <span id="playerNick" class="player-name"></span></p>
+            <div id="playerBalance" class="balance-amount">0 $</div>
+            
+            <form id="transferForm" method="POST" action="https://script.google.com/macros/s/AKfycbyUl9Ut4E504hKLZ68Hkzhbq2eW5lZVMJ-9USdl5n-VhJoj8I4hivIedcORVTOLc2wB/exec">
+                <input type="hidden" id="hiddenFromId" name="fromId">
+                <input type="hidden" id="hiddenRedirect" name="redirectUrl">
+
+                <div class="transfer-box">
+                    <h3 style="color:#fff; font-size:14px; margin-bottom:15px; text-transform:uppercase; text-align:center;">💸 Новий переказ</h3>
+                    
+                    <div class="input-group">
+                        <label>Отримувач (Нік або SteamID)</label>
+                        <input type="text" name="toInput" placeholder="Нікнейм або SteamID64" required style="text-align:left; padding-left:15px;">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Сума ($)</label>
+                        <input type="number" name="amount" placeholder="0" required style="text-align:left; padding-left:15px;">
+                    </div>
+                    
+                    <input type="submit" class="btn-transfer" value="Підтвердити переказ">
+                </div>
+            </form>
+        </div>
+
+        <div id="errorBox" class="error-box"></div>
+    </div>
+
+    <script>
+        // Твоє посилання на CSV з перших кроків
+        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0hlrMsYI6LdLEfrhA6ZVfWFEAE38GUx0hsU1bu2untUN4mg9GTeYn0jljooAljL1UWFnr6Ve-jv_0/pub?gid=0&single=true&output=csv";
+
+        // Заповнюємо адресу для повернення на сайт після переказу
+        document.getElementById('hiddenRedirect').value = window.location.href;
+
+        async function checkBalance() {
+            const searchId = document.getElementById('steamIdInput').value.trim();
+            const resultBox = document.getElementById('resultBox');
+            const errorBox = document.getElementById('errorBox');
+            
+            resultBox.style.display = 'none';
+            errorBox.style.display = 'none';
+
+            if (!searchId) return alert("Введіть SteamID!");
+
+            try {
+                const response = await fetch(csvUrl + '&nocache=' + new Date().getTime());
+                const data = await response.text();
+                const rows = data.split("\n").map(row => row.split(","));
+                let playerFound = false;
+
+                for (let i = 1; i < rows.length; i++) {
+                    if (!rows[i] || rows[i].length < 3) continue;
+                    
+                    const steamId = rows[i][0].trim();
+                    const nickname = rows[i][1].trim();
+                    const balance = rows[i][2].trim();
+                    
+                    if (steamId === searchId) {
+                        document.getElementById('playerNick').innerText = nickname;
+                        document.getElementById('playerBalance').innerText = parseFloat(balance).toLocaleString('uk-UA') + " $";
+                        
+                        // Записуємо дані у приховані поля форми переказу
+                        document.getElementById('hiddenFromId').value = steamId;
+
+                        document.getElementById('authBlock').style.display = 'none';
+                        resultBox.style.display = 'block';
+                        playerFound = true;
+                        break;
+                    }
+                }
+
+                if (!playerFound) {
+                    errorBox.innerText = "❌ Вас не знайдено в базі даних.";
+                    errorBox.style.display = 'block';
+                }
+            } catch (error) {
+                alert("Помилка бази даних.");
+            }
+        }
+    </script>
+</body>
+</html>
