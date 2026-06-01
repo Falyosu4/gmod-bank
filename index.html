@@ -105,8 +105,12 @@
 
         // Налаштування адрес повернення
         const cleanUrl = window.location.href.split('?')[0];
-        document.getElementById('loginRedirect').value = cleanUrl;
-        document.getElementById('hiddenRedirect').value = cleanUrl;
+        if(document.getElementById('loginRedirect')) {
+            document.getElementById('loginRedirect').value = cleanUrl;
+        }
+        if(document.getElementById('hiddenRedirect')) {
+            document.getElementById('hiddenRedirect').value = cleanUrl;
+        }
 
         // КРОК 1: Перевіряємо через швидкий CSV, чи існує гравець і чи потрібен PIN
         async function step1Check() {
@@ -183,7 +187,6 @@
             }
         }
 
-        // Запуск авто-входу при завантаженні сторінки
         autoLoginFromUrl();
     </script>
 </body>
