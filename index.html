@@ -26,7 +26,7 @@
             width: 100%; padding: 14px; background: #111115; border: 2px solid #2d2d3d;
             border-radius: 8px; color: #fff; font-size: 16px; text-align: center; transition: border-color 0.3s;
         }
-        input:focus { border-color: #4a5568; outline: none; }
+        input:focus { border-color: #3182ce; outline: none; }
         button, input[type="submit"] {
             width: 100%; padding: 14px; background: #3182ce; border: none; border-radius: 8px;
             color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s;
@@ -34,36 +34,48 @@
         button:hover, input[type="submit"]:hover { background: #2b6cb0; }
         .btn-transfer { background: #e53e3e; }
         .btn-transfer:hover { background: #c53030; }
-        .result-box {
-            margin-top: 30px; padding-top: 25px; border-top: 1px solid #2d2d3d;
-            display: none;
-        }
+        .result-box { margin-top: 30px; padding-top: 25px; border-top: 1px solid #2d2d3d; display: none; }
         .transfer-box { margin-top: 25px; padding-top: 25px; border-top: 1px dashed #2d2d3d; text-align: left; }
         .player-name { color: #63b3ed; font-weight: bold; }
         .balance-amount { font-size: 32px; color: #48bb78; font-weight: bold; margin-top: 5px; margin-bottom: 15px;}
         .error-box { margin-top: 25px; color: #f56565; font-size: 15px; display: none; }
+        .pin-notice { font-size: 13px; color: #ecc94b; margin-bottom: 15px; text-align: center; }
     </style>
 </head>
 <body>
 
     <div class="bank-card">
         <div class="bank-logo">🏦</div>
-        <h2>Центральний Банк</h2>
-        <p class="subtitle">Електронні перекази</p>
+        <h2>ПриватБанк</h2>
+        <p class="subtitle">Захищені електронні рахунки</p>
 
         <div id="authBlock">
-            <div class="input-group">
-                <input type="text" id="steamIdInput" placeholder="Введіть свій SteamID">
-            </div>
-            <button onclick="checkBalance()">Увійти в кабінет</button>
+            <form id="loginForm" method="POST" action="https://script.google.com/macros/s/AKfycbyUl9Ut4E504hKLZ68Hkzhbq2eW5lZVMJ-9USdl5n-VhJoj8I4hivIedcORVTOLc2wB/exec">
+                <input type="hidden" id="loginRedirect" name="redirectUrl">
+                <div class="input-group">
+                    <label>Ваш SteamID</label>
+                    <input type="text" id="steamIdInput" name="fromId" placeholder="76561198..." required>
+                </div>
+                
+                <div id="pinBlock" style="display: none;">
+                    <div id="pinNotice" class="pin-notice"></div>
+                    <div class="input-group">
+                        <label>Введіть 4-значний PIN-код</label>
+                        <input type="password" id="pinInput" name="pin" placeholder="****" maxlength="8">
+                    </div>
+                    <input type="submit" value="Увійти в кабінет">
+                </div>
+            </form>
+            <button id="checkBtn" onclick="step1Check()">Продовжити</button>
         </div>
 
         <div id="resultBox" class="result-box">
             <p style="color:#a0aec0;">Вітаємо, <span id="playerNick" class="player-name"></span></p>
             <div id="playerBalance" class="balance-amount">0 $</div>
             
-            <form id="transferForm" method="POST" action="https://script.google.com/macros/s/AKfycbyUl9Ut4E504hKLZ68Hkzhbq2eW5lZVMJ-9USdl5n-VhJoj8I4hivIedcORVTOLc2wB/exec">
+            <form id="transferForm" method="POST" action="ВСТАВ_СЮДИ_URL_ВЕБ_ДОДАТКУ" target="_blank">
                 <input type="hidden" id="hiddenFromId" name="fromId">
+                <input type="hidden" id="hiddenPin" name="pin">
                 <input type="hidden" id="hiddenRedirect" name="redirectUrl">
 
                 <div class="transfer-box">
@@ -88,20 +100,23 @@
     </div>
 
     <script>
-        // Твоє посилання на CSV з перших кроків
         const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0hlrMsYI6LdLEfrhA6ZVfWFEAE38GUx0hsU1bu2untUN4mg9GTeYn0jljooAljL1UWFnr6Ve-jv_0/pub?gid=0&single=true&output=csv";
+        const scriptUrl = "ВСТАВ_СЮДИ_URL_ВЕБ_ДОДАТКУ";
 
-        // Заповнюємо адресу для повернення на сайт після переказу
-        document.getElementById('hiddenRedirect').value = window.location.href;
+        // Налаштування адрес повернення
+        const cleanUrl = window.location.href.split('?')[0];
+        document.getElementById('loginRedirect').value = cleanUrl;
+        document.getElementById('hiddenRedirect').value = cleanUrl;
 
-        async function checkBalance() {
+        // КРОК 1: Перевіряємо через швидкий CSV, чи існує гравець і чи потрібен PIN
+        async function step1Check() {
             const searchId = document.getElementById('steamIdInput').value.trim();
-            const resultBox = document.getElementById('resultBox');
             const errorBox = document.getElementById('errorBox');
-            
-            resultBox.style.display = 'none';
-            errorBox.style.display = 'none';
+            const pinBlock = document.getElementById('pinBlock');
+            const pinNotice = document.getElementById('pinNotice');
+            const checkBtn = document.getElementById('checkBtn');
 
+            errorBox.style.display = 'none';
             if (!searchId) return alert("Введіть SteamID!");
 
             try {
@@ -112,21 +127,19 @@
 
                 for (let i = 1; i < rows.length; i++) {
                     if (!rows[i] || rows[i].length < 3) continue;
-                    
-                    const steamId = rows[i][0].trim();
-                    const nickname = rows[i][1].trim();
-                    const balance = rows[i][2].trim();
-                    
-                    if (steamId === searchId) {
-                        document.getElementById('playerNick').innerText = nickname;
-                        document.getElementById('playerBalance').innerText = parseFloat(balance).toLocaleString('uk-UA') + " $";
-                        
-                        // Записуємо дані у приховані поля форми переказу
-                        document.getElementById('hiddenFromId').value = steamId;
-
-                        document.getElementById('authBlock').style.display = 'none';
-                        resultBox.style.display = 'block';
+                    if (rows[i][0].trim() === searchId) {
                         playerFound = true;
+                        const hasPin = rows[i][3] && rows[i][3].trim() !== "";
+                        
+                        if (hasPin) {
+                            pinNotice.innerText = "🔒 Цей рахунок захищено. Введіть ваш PIN.";
+                        } else {
+                            pinNotice.innerText = "✨ Перший вхід! Придумайте та введіть новий PIN-код для захисту.";
+                        }
+                        
+                        document.getElementById('steamIdInput').readOnly = true;
+                        checkBtn.style.display = 'none';
+                        pinBlock.style.display = 'block';
                         break;
                     }
                 }
@@ -135,10 +148,43 @@
                     errorBox.innerText = "❌ Вас не знайдено в базі даних.";
                     errorBox.style.display = 'block';
                 }
-            } catch (error) {
-                alert("Помилка бази даних.");
+            } catch (e) { alert("Помилка зчитування бази даних."); }
+        }
+
+        // КРОК 2: Автоматичний вхід після редиректу від Google
+        async function autoLoginFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const steamId = urlParams.get('steamid');
+            const pin = urlParams.get('pin');
+
+            if (steamId && pin) {
+                try {
+                    const response = await fetch(csvUrl + '&nocache=' + new Date().getTime());
+                    const data = await response.text();
+                    const rows = data.split("\n").map(row => row.split(","));
+
+                    for (let i = 1; i < rows.length; i++) {
+                        if (rows[i][0].trim() === steamId) {
+                            document.getElementById('playerNick').innerText = rows[i][1].trim();
+                            document.getElementById('playerBalance').innerText = parseFloat(rows[i][2]).toLocaleString('uk-UA') + " $";
+                            
+                            document.getElementById('hiddenFromId').value = steamId;
+                            document.getElementById('hiddenPin').value = pin;
+                            
+                            document.getElementById('authBlock').style.display = 'none';
+                            document.getElementById('resultBox').style.display = 'block';
+                            
+                            // Очищаємо параметри в адресному рядку для краси
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                            break;
+                        }
+                    }
+                } catch (e) {}
             }
         }
+
+        // Запуск авто-входу при завантаженні сторінки
+        autoLoginFromUrl();
     </script>
 </body>
 </html>
